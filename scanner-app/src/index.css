@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@600;700;800&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --primary: #ff4d00;
+  --primary-deep: #e34100;
+  --dark: #141822;
+  --dark-soft: #202635;
+  --light: #f5f5f5;
+  --success: #1fa86a;
+  --danger: #de3f52;
+  --warning: #f0b429;
+  --text-main: #f5f8ff;
+  --text-dim: #aeb7cc;
+}
+
+body {
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(255, 77, 0, 0.2), transparent 35%),
+    radial-gradient(circle at 80% 90%, rgba(54, 113, 255, 0.14), transparent 40%),
+    var(--dark);
+  color: var(--text-main);
+}
+
+/* Subtle animated background shift for a lively look */
+body {
+  background-size: 200% 200%;
+  animation: bgShift 18s ease-in-out infinite;
+}
+
+@keyframes bgShift {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
+}
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Prevent zoom on iOS */
+input, textarea, select {
+  font-size: 16px !important;
+}
