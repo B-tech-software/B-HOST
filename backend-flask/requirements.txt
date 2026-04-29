@@ -3,3 +3,5 @@ flask-cors
 requests
 firebase-admin
 qrcode[pil]
+gunicorn
+python-dotenv

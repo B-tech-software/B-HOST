@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "source": ".",
+    "runtime": "python39"
+  },
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
