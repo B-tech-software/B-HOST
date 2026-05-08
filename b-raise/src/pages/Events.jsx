@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
-import { db } from '../config/firebase.js';
+import { db, isFirebaseConfigured } from '../config/firebase.js';
 import AvailableEvents from '../components/AvailableEvents';
 import { isPublicEventStatus, normalizeEventStatus } from '../utils/events.js';
+import { featuredEvents } from '../data/featuredEvents.js';
 
 const FALLBACK_IMAGE =
   'https://images.pexels.com/photos/167636/pexels-photo-167636.jpeg?auto=compress&cs=tinysrgb&w=1200';
@@ -13,6 +14,12 @@ const Events = () => {
 
   useEffect(() => {
     const loadEvents = async () => {
+      if (!isFirebaseConfigured || !db) {
+        setEvents(featuredEvents);
+        setLoading(false);
+        return;
+      }
+
       try {
         const eventsRef = collection(db, 'events');
         const q = query(eventsRef, orderBy('createdAt', 'desc'));
@@ -56,10 +63,10 @@ const Events = () => {
           };
         }).filter((event) => isPublicEventStatus(event.status));
 
-        setEvents(docs);
+        setEvents(docs.length > 0 ? docs : featuredEvents);
       } catch (err) {
         console.error('Error loading events from Firestore:', err);
-        setEvents([]);
+        setEvents(featuredEvents);
       } finally {
         setLoading(false);
       }

@@ -1,7 +1,6 @@
 import React, { createContext, useEffect, useState } from 'react';
-import { db } from '../config/firebase.js';
+import { db, auth, isFirebaseConfigured } from '../config/firebase.js';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth } from '../config/firebase.js';
 import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
@@ -20,7 +19,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const ensureUserProfile = async (firebaseUser) => {
-    if (!firebaseUser) return;
+    if (!firebaseUser || !db) return;
     const userRef = doc(db, 'users', firebaseUser.uid);
     const userSnap = await getDoc(userRef);
     if (!userSnap.exists()) {
@@ -36,6 +35,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    if (!isFirebaseConfigured || !auth) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     // Always set up the auth state listener immediately
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -57,22 +62,34 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const signup = (email, password) => {
+    if (!auth) {
+      return Promise.reject(new Error('Firebase auth is not configured for this deployment.'));
+    }
     return createUserWithEmailAndPassword(auth, email, password).then(
       (cred) => cred.user
     );
   };
 
   const login = (email, password) => {
+    if (!auth) {
+      return Promise.reject(new Error('Firebase auth is not configured for this deployment.'));
+    }
     return signInWithEmailAndPassword(auth, email, password).then(
       (cred) => cred.user
     );
   };
 
   const logout = () => {
+    if (!auth) {
+      return Promise.resolve();
+    }
     return signOut(auth);
   };
 
     const loginWithGoogle = async () => {
+      if (!auth) {
+        throw new Error('Firebase auth is not configured for this deployment.');
+      }
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 

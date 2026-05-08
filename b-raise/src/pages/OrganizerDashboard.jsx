@@ -20,6 +20,7 @@ const OrganizerDashboard = () => {
   const [scannerCodeError, setScannerCodeError] = useState('');
   const [scannerCodeSuccess, setScannerCodeSuccess] = useState('');
   const [generatedCodes, setGeneratedCodes] = useState([]);
+  const [viewMode, setViewMode] = useState('active');
 
   const parseScannerTeam = (rawValue) => {
     if (!rawValue || typeof rawValue !== 'string') return [];
@@ -148,11 +149,18 @@ const OrganizerDashboard = () => {
       setLastUpdated(new Date().toLocaleTimeString());
 
       setSelectedEventId((prev) => {
-        if (prev && items.some((event) => event.id === prev)) {
+        const matchingViewItems = items.filter((event) => {
+          const normalized = String(event?.status || '').toLowerCase();
+          return viewMode === 'trash' ? normalized === 'deleted' : normalized !== 'deleted';
+        });
+
+        if (prev && matchingViewItems.some((event) => event.id === prev)) {
           return prev;
         }
-        const firstActive = items.find((event) => ['approved', 'active', 'live'].includes(event.status));
-        return firstActive?.id || items[0]?.id || '';
+        const firstPreferred = viewMode === 'trash'
+          ? matchingViewItems[0]
+          : matchingViewItems.find((event) => ['approved', 'active', 'live'].includes(String(event?.status || '').toLowerCase())) || matchingViewItems[0];
+        return firstPreferred?.id || '';
       });
     } catch (err) {
       console.error('Failed to load organizer event stats:', err);
@@ -188,26 +196,32 @@ const OrganizerDashboard = () => {
   }, [organizerStatus, user?.uid]);
 
   const selectableEvents = useMemo(() => {
-    const list = Array.isArray(eventsStats) ? [...eventsStats] : [];
+    const baseList = Array.isArray(eventsStats) ? [...eventsStats] : [];
+    const list = baseList.filter((event) => {
+      const normalized = String(event?.status || '').toLowerCase();
+      return viewMode === 'trash' ? normalized === 'deleted' : normalized !== 'deleted';
+    });
     return list.sort((a, b) => {
       const aDate = String(a?.date || '');
       const bDate = String(b?.date || '');
       return bDate.localeCompare(aDate);
     });
-  }, [eventsStats]);
+  }, [eventsStats, viewMode]);
 
   const selectedEvent = useMemo(
-    () => eventsStats.find((event) => event.id === selectedEventId) || null,
-    [eventsStats, selectedEventId]
+    () => selectableEvents.find((event) => event.id === selectedEventId) || null,
+    [selectableEvents, selectedEventId]
   );
 
   const dashboardStats = useMemo(() => {
-    const totalEvents = selectableEvents.length;
+    const totalEvents = eventsStats.filter((event) => String(event?.status || '').toLowerCase() !== 'deleted').length;
+    const deletedEvents = eventsStats.filter((event) => String(event?.status || '').toLowerCase() === 'deleted').length;
 
     return {
       totalEvents,
+      deletedEvents,
     };
-  }, [selectableEvents]);
+  }, [eventsStats]);
 
   const normalizeTicketKey = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 
@@ -272,8 +286,29 @@ const OrganizerDashboard = () => {
     const normalized = String(status || '').toLowerCase();
     if (['approved', 'active', 'live'].includes(normalized)) return 'success';
     if (['draft', 'pending'].includes(normalized)) return 'warning';
-    if (['rejected', 'cancelled', 'archived'].includes(normalized)) return 'danger';
+    if (['rejected', 'cancelled', 'archived', 'deleted'].includes(normalized)) return 'danger';
     return 'secondary';
+  };
+
+  const mutateEventStatus = async (eventId, action) => {
+    const token = await user.getIdToken();
+    const endpoint = action === 'restore' ? API_ENDPOINTS.RESTORE_EVENT : API_ENDPOINTS.DELETE_EVENT;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ eventId, uid: user.uid }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.message || `${action} failed`);
+    }
+
+    await loadEventStats();
+    return payload;
   };
 
   if (!authLoading && !user) {
@@ -333,7 +368,30 @@ const OrganizerDashboard = () => {
                             <div className="kpi-value">{dashboardStats.totalEvents}</div>
                           </div>
                         </Col>
+                        <Col md={6} xl={3}>
+                          <div className="dashboard-kpi-card">
+                            <div className="kpi-label">Deleted events</div>
+                            <div className="kpi-value">{dashboardStats.deletedEvents}</div>
+                          </div>
+                        </Col>
                       </Row>
+
+                      <div className="d-flex flex-wrap gap-2 mb-3">
+                        <Button
+                          variant={viewMode === 'active' ? 'light' : 'outline-light'}
+                          size="sm"
+                          onClick={() => setViewMode('active')}
+                        >
+                          Active events
+                        </Button>
+                        <Button
+                          variant={viewMode === 'trash' ? 'light' : 'outline-light'}
+                          size="sm"
+                          onClick={() => setViewMode('trash')}
+                        >
+                          Trash ({dashboardStats.deletedEvents})
+                        </Button>
+                      </div>
 
                       {selectableEvents.length === 0 ? (
                         <Alert variant="secondary" className="mb-0">
@@ -383,9 +441,33 @@ const OrganizerDashboard = () => {
                                       {selectedEvent.date || 'Date TBD'} {selectedEvent.time ? `• ${selectedEvent.time}` : ''} {selectedEvent.venue ? `• ${selectedEvent.venue}` : ''}
                                     </div>
                                   </div>
-                                  <Badge bg={getStatusVariant(selectedEvent.status)} className="text-uppercase event-status-badge">
-                                    {selectedEvent.status || 'unknown'}
-                                  </Badge>
+                                  <div className="d-flex align-items-center gap-2">
+                                    <Badge bg={getStatusVariant(selectedEvent.status)} className="text-uppercase event-status-badge">
+                                      {selectedEvent.status || 'unknown'}
+                                    </Badge>
+                                    <Button
+                                      variant={String(selectedEvent.status || '').toLowerCase() === 'deleted' ? 'outline-success' : 'outline-danger'}
+                                      size="sm"
+                                      onClick={async () => {
+                                        const isDeleted = String(selectedEvent.status || '').toLowerCase() === 'deleted';
+                                        const action = isDeleted ? 'restore' : 'delete';
+                                        const promptText = isDeleted
+                                          ? 'Restore this event back to the dashboard?'
+                                          : 'Move this event to Trash? You can restore it later.';
+                                        if (!window.confirm(promptText)) return;
+                                        try {
+                                          await mutateEventStatus(selectedEvent.id, action);
+                                          setViewMode(isDeleted ? 'active' : 'trash');
+                                          alert(isDeleted ? 'Event restored' : 'Event moved to trash');
+                                        } catch (err) {
+                                          console.error('Event status change failed', err);
+                                          alert(err.message || 'Failed to update event');
+                                        }
+                                      }}
+                                    >
+                                      {String(selectedEvent.status || '').toLowerCase() === 'deleted' ? 'Restore' : 'Delete'}
+                                    </Button>
+                                  </div>
                                 </div>
 
                                 <Row className="g-3 mb-3">

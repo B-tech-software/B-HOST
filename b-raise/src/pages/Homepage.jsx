@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
-import { db } from '../config/firebase.js';
+import { db, isFirebaseConfigured } from '../config/firebase.js';
 import SearchBar from '../components/SearchBar';
 import EventCategories from '../components/EventCategories';
 import AvailableEvents from '../components/AvailableEvents';
 import { isPublicEventStatus, normalizeEventStatus } from '../utils/events.js';
+import { featuredEvents } from '../data/featuredEvents.js';
 
 const FALLBACK_IMAGE =
   'https://images.pexels.com/photos/167636/pexels-photo-167636.jpeg?auto=compress&cs=tinysrgb&w=1200';
@@ -20,6 +21,12 @@ const Homepage = () => {
 
   useEffect(() => {
     const loadEvents = async () => {
+      if (!isFirebaseConfigured || !db) {
+        setEvents(featuredEvents);
+        setLoading(false);
+        return;
+      }
+
       try {
         const eventsRef = collection(db, 'events');
         const q = query(eventsRef, orderBy('createdAt', 'desc'));
@@ -63,10 +70,10 @@ const Homepage = () => {
           };
         }).filter((event) => isPublicEventStatus(event.status));
 
-        setEvents(docs);
+        setEvents(docs.length > 0 ? docs : featuredEvents);
       } catch (err) {
         console.error('Error loading events for homepage from Firestore:', err);
-        setEvents([]);
+        setEvents(featuredEvents);
       } finally {
         setLoading(false);
       }
@@ -201,7 +208,7 @@ const Homepage = () => {
       <AvailableEvents
         events={filteredEvents}
         loading={loading}
-        showEmptyState={!searchQuery}
+        showEmptyState={!searchQuery && filteredEvents.length > 0}
       />
       {!loading && filteredEvents.length === 0 && searchQuery && (
         <div className="text-center py-4">

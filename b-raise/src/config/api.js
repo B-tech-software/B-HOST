@@ -48,6 +48,8 @@ export const API_ENDPOINTS = {
   ADMIN_PENDING_ORGANIZERS: `${API_BASE_URL}/api/organizers/pending`,
   ADMIN_REVIEW_ORGANIZER: `${API_BASE_URL}/api/organizers/review`,
   ADMIN_PENDING_EVENTS: `${API_BASE_URL}/api/organizers/admin/events/pending`,
+  DELETE_EVENT: `${API_BASE_URL}/api/organizers/events/delete`,
+  RESTORE_EVENT: `${API_BASE_URL}/api/organizers/events/restore`,
 
   // Contact form
   CONTACT_SUBMIT: `${API_BASE_URL}/api/contact/submit`,

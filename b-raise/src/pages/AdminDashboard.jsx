@@ -259,6 +259,26 @@ const AdminDashboard = () => {
     }
   };
 
+  const mutateEventStatus = async (eventId, action) => {
+    try {
+      const headers = await getAuthHeaders();
+      const endpoint = action === 'restore' ? API_ENDPOINTS.RESTORE_EVENT : API_ENDPOINTS.DELETE_EVENT;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ eventId }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.message || `${action} failed`);
+      }
+      await loadOwnerEventStats();
+      return payload;
+    } catch (err) {
+      throw err;
+    }
+  };
+
   return (
     <div className="contact-page py-5 dash-shell owner-dash-shell" style={{ minHeight: '100vh' }}>
       <Container>
@@ -383,9 +403,32 @@ const AdminDashboard = () => {
                           {selectedOwnerEvent.date || 'Date TBD'} {selectedOwnerEvent.time ? `• ${selectedOwnerEvent.time}` : ''} {selectedOwnerEvent.venue ? `• ${selectedOwnerEvent.venue}` : ''}
                         </div>
                       </div>
-                      <Badge bg="info" text="dark" className="text-uppercase event-status-badge">
-                        {selectedOwnerEvent.status || 'unknown'}
-                      </Badge>
+                      <div className="d-flex align-items-center gap-2">
+                        <Badge bg="info" text="dark" className="text-uppercase event-status-badge">
+                          {selectedOwnerEvent.status || 'unknown'}
+                        </Badge>
+                        <Button
+                          variant={String(selectedOwnerEvent.status || '').toLowerCase() === 'deleted' ? 'outline-success' : 'outline-danger'}
+                          size="sm"
+                          onClick={async () => {
+                            const isDeleted = String(selectedOwnerEvent.status || '').toLowerCase() === 'deleted';
+                            const action = isDeleted ? 'restore' : 'delete';
+                            const promptText = isDeleted
+                              ? 'Restore this event back to the dashboard?'
+                              : 'Move this event to Trash? You can restore it later.';
+                            if (!window.confirm(promptText)) return;
+                            try {
+                              await mutateEventStatus(selectedOwnerEvent.id, action);
+                              alert(isDeleted ? 'Event restored' : 'Event moved to trash');
+                            } catch (err) {
+                              console.error('Event status change failed', err);
+                              alert(err.message || 'Failed to update event');
+                            }
+                          }}
+                        >
+                          {String(selectedOwnerEvent.status || '').toLowerCase() === 'deleted' ? 'Restore' : 'Delete'}
+                        </Button>
+                      </div>
                     </div>
 
                     <Row className="g-3 mb-3">

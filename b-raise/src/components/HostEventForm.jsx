@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Form, Button, Row, Col, Alert } from 'react-bootstrap';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../config/firebase.js';
+import { db, storage, isFirebaseConfigured } from '../config/firebase.js';
 import { API_ENDPOINTS } from '../config/api.js';
 import { useAuth } from '../context/useAuth.js';
 import { eventCategories } from './EventCategories.jsx';
@@ -157,6 +157,11 @@ const HostEventForm = () => {
     setError('');
     setSuccessMessage('');
 
+    if (!isFirebaseConfigured || !db) {
+      setError('Event hosting is unavailable on this deployment until Firebase is configured.');
+      return;
+    }
+
     if (!user?.uid) {
       setError('Please sign in first to add an event.');
       return;
@@ -199,6 +204,10 @@ const HostEventForm = () => {
       // If a poster file was selected, upload it and use its URL.
       // Use a user-scoped path to align with common Firebase Storage rules.
       if (posterFile) {
+        if (!storage) {
+          throw new Error('Poster upload is unavailable because Firebase Storage is not configured.');
+        }
+
         try {
           const safeFileName = String(posterFile.name || 'poster.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
           const storageRef = ref(
